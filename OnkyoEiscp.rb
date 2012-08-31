@@ -154,7 +154,7 @@ module OnkyoEiscp
     end
 
     def update(state)
-        puts "------------% Folder Info %------------"
+      puts "------------% Folder Info %------------"
       state[:folder_entries].each { |e| puts "#{e[0]} #{e[1]}" } unless state[:folder_entries].nil?
       puts "Artist: #{state[:artist]}"
       puts "Album: #{state[:album]}"
