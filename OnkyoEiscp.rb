@@ -154,7 +154,7 @@ module OnkyoEiscp
     end
 
     def update(state)
-      puts "------------% Folder Info %------------"
+      puts "--------------% Folder Info %---------------"
       state[:folder_entries].each { |e| puts "#{e[0]} #{e[1]}" } unless state[:folder_entries].nil?
       puts "Artist: #{state[:artist]}"
       puts "Album: #{state[:album]}"
@@ -227,19 +227,12 @@ module OnkyoEiscp
 
     def send(c, *arg)
       raise "Not connected" unless connected?
-
       # plain numbers get translated as the "n" command followed by the given number
       c, arg = "n", c if c =~ /[0-9]/      
-
       command = COMMANDS[c.to_sym]
-      
       raise "No such command" if command.nil?
-      if command.respond_to? :call
-        command = command.call arg[0]
-      end
-
+      command = command.call arg[0] if command.respond_to? :call
       size = command.length + 3
-
       packet = "ISCP\x00\x00\x00\x10\x00\x00\x00" << [size].pack("C") << 
                "\x01\x00\x00\x00!1" << command << "\r"
 
