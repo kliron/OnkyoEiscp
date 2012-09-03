@@ -232,7 +232,7 @@ module OnkyoEiscp
 
     def send(c, *arg)
       raise "Not connected" unless connected?
-      # if only a number is given it get translated as the "n" command followed by 
+      # if only a number is given it gets translated as the "n" command followed by 
       # the given number
       c, arg = "n", c if c =~ /^[0-9]$/      
       command = COMMANDS[c.to_sym]
