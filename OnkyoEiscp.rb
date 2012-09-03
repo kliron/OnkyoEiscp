@@ -4,6 +4,7 @@ module OnkyoEiscp
 
   require 'socket'
   require 'observer'
+  require 'json'
 
 @@help = %s{
 
@@ -139,7 +140,7 @@ module OnkyoEiscp
   :album => "NALQSTN",
   :title => "NTIQSTN",
   :track => "NTRQSTN",
-  :n? => "NLSQSTN",
+  :n? => "NSTQSTN",
   :dlna => "NSV000",
   :favorites => "NSV010",
   :vtuner => "NSV020",
@@ -149,21 +150,25 @@ module OnkyoEiscp
 
 
   class Watcher
-    def initialize(c)
-      c.add_observer(self)
+    def initialize(c, f=:update)
+      c.add_observer(self, f)
     end
 
     def update(state)
       puts "--------------% Folder Info %---------------"
-      state[:folder_entries].each { |e| puts "#{e[0]} #{e[1]}" } unless state[:folder_entries].nil?
+      entries = state[:folder_entries] || []
+      entries.each_with_index { |e,i| puts "%s" % (i == state[:cursor_pos] ? "*" : " ") + "#{i} #{e}" } 
       puts "Artist: #{state[:artist]}"
       puts "Album: #{state[:album]}"
       puts "Track: #{state[:track]}"
       puts "Volume: #{state[:volume]}, Mute: #{state[:mute]}, Speaker layout: #{state[:speaker_layout]}"
-      puts "Cursor at: #{state[:cursor_pos]}"
       puts "Play: #{state[:play]}, Repeat: #{state[:repeat]}, Shuffle: #{state[:shuffle]}"
       puts "Time: #{state[:time]}"
     end
+
+    def jsonize(state)
+      state.to_json
+    end   
   end
 
 
@@ -198,7 +203,7 @@ module OnkyoEiscp
             while packet = @socket.recv(1024)
               data << packet
               next unless packet =~ /\r\n$/
-              data.split(/ISCP/).each do |p| 
+              data.split(/ISCP/).reject!(&:empty?).each do |p| 
                 msg = p[14..-4]  # first 13 bytes are the header, last 3 the EOL sequence
                 handler.call msg unless msg.nil?   
               end
@@ -230,7 +235,7 @@ module OnkyoEiscp
       # plain numbers get translated as the "n" command followed by the given number
       c, arg = "n", c if c =~ /[0-9]/      
       command = COMMANDS[c.to_sym]
-      raise "No such command" if command.nil?
+      raise "#{c}: No such command" if command.nil?
       command = command.call arg[0] if command.respond_to? :call
       size = command.length + 3
       packet = "ISCP\x00\x00\x00\x10\x00\x00\x00" << [size].pack("C") << 
@@ -276,10 +281,10 @@ module OnkyoEiscp
            when "NLS"
              idx = params[1]
              case params[0]
-             when "C" then @state[:cursor_pos] = idx
+             when "C" then @state[:cursor_pos] = idx.to_i
              when /A|U/
                @state[:folder_entries] = [] if idx == "0"
-               @state[:folder_entries].push [idx, params[3..params.length]]
+               @state[:folder_entries].push params[3..params.length]
              end
            else 
              nil
@@ -302,7 +307,7 @@ module OnkyoEiscp
       send "a?"; sleep 0.2
       send "m?"; sleep 0.2
       send "s?"; sleep 0.2
-      send "n?"; sleep 0.2  
+      send "n?"; sleep 0.2
     end
 
   end
@@ -312,7 +317,7 @@ module OnkyoEiscp
   def self.main
     
     client = OnkyoClient.new SERVER_IP, SERVER_PORT
-    watcher = Watcher.new client
+    watcher = Watcher.new client, :update
     # 2 handlers user can switch at runtime. ^C to force client restart afterwards.
     printer = proc { |m| puts m unless m =~ /^NTM/ }
     updater = proc { |m| client.update m }
@@ -337,7 +342,7 @@ module OnkyoEiscp
           puts "#{eval command}"
         else 
           # Everything else is an onkyo command 
-          client.send *(command.split)
+          client.send *command.split unless command.empty?
         end
       rescue Exception => e
         puts e 

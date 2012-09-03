@@ -1,3 +1,5 @@
+Ruby 1.9 required. 
+
 You can either run this file as a script or require the module in your own scripts. Change the 
 SERVER_IP and SERVER_PORT according to your configuration. 
 
