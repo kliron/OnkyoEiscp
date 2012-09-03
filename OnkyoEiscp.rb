@@ -6,9 +6,7 @@ module OnkyoEiscp
   require 'observer'
   require 'json'
 
-@@help = %s{
-
-  Command reference:
+@@help = %s{ Command reference:
 
     p0 => standby
     p1 => system on
@@ -18,15 +16,15 @@ module OnkyoEiscp
     sw => Sets FrontWide / SurrBack + FrontWide
     shw => Sets Front High + Front Wide 
     up => Sets speaker switch wrap-around
-    s? => Gets the speaker state
+    speaker? => Gets the speaker state
     m1 => Mute ON
     m0 => Mute OFF
     m? => Gets the audio muting state
     m => Sets audio muting wrap-around
-    au => Master volume level up
-    ad => Master volume level down
-    a => Followed by a hex literal in the range "00"-"64" (volume level in hexadecimal)
-    a? => Get master volume level
+    vu => Master volume level up
+    vd => Master volume level down
+    v => Followed by a hex literal in the range "00"-"64" (volume level in hexadecimal)
+    v? => Get master volume level
     net => NET 
     vcr => VCR/DVR
     cbl => CBL/SAT
@@ -56,7 +54,7 @@ module OnkyoEiscp
     tdn => Track down
     u => Up
     d => Down
-    s => Select 
+    s => Select current element. Pressing ENTER without any arguments translates also to 's'
     n => Followed by a number 0-9 (separated by space). Select line number. 
     r => Return
     cu => Channel up (iRadio)
@@ -68,7 +66,7 @@ module OnkyoEiscp
     album 
     title 
     track 
-    n? => State of the NET input     
+    status? => State of the NET input     
     dlna 
     favorites 
     vtuner 
@@ -88,16 +86,16 @@ module OnkyoEiscp
   :m1 => "AMT01",
   :m? => "AMTQSTN",
   :m => "AMTTG",
-  :au => "MVLUP",
-  :ad => "MVLDOWN",
-  :a => ->(a) { "MVL" << a }, 
-  :a? => "MVLQSTN",
+  :vu => "MVLUP",
+  :vd => "MVLDOWN",
+  :v => ->(a) { "MVL" << a }, 
+  :v? => "MVLQSTN",
   :sb => "SPLSB",
   :sh => "SPLFH",
   :sw => "SPLFW",
   :shw => "SPLHW",
   :up => "SPLUP",
-  :s? => "SPLQSTN",
+  :speaker? => "SPLQSTN",
   :net => "SLI2B",
   :vcr => "SLI00",
   :cbl => "SLI01",
@@ -128,8 +126,7 @@ module OnkyoEiscp
   :u => "NTCUP",
   :d => "NTCDOWN",
   :s => "NTCSELECT",
-  :n => ->(a) { "NLSL" << a },    # Select line a. For convenience, if the user gives 
-                                  # just a number between 0-9 it gets translated as "n <num>"  
+  :n => ->(a) { "NLSL" << a },    
   :r => "NTCRETURN",
   :cu => "NTCCHUP",
   :cd => "NTCCHDN",
@@ -140,7 +137,7 @@ module OnkyoEiscp
   :album => "NALQSTN",
   :title => "NTIQSTN",
   :track => "NTRQSTN",
-  :n? => "NSTQSTN",
+  :status? => "NSTQSTN",
   :dlna => "NSV000",
   :favorites => "NSV010",
   :vtuner => "NSV020",
@@ -158,9 +155,9 @@ module OnkyoEiscp
       puts "--------------% Folder Info %---------------"
       entries = state[:folder_entries] || []
       entries.each_with_index { |e,i| puts "%s" % (i == state[:cursor_pos] ? "*" : " ") + "#{i} #{e}" } 
-      puts "Artist: #{state[:artist]}"
-      puts "Album: #{state[:album]}"
-      puts "Track: #{state[:track]}"
+      puts "Artist: #{state[:artist] || "----"}"
+      puts "Album: #{state[:album] || "----"}"
+      puts "Track: #{state[:track] || "----/----"}"
       puts "Volume: #{state[:volume]}, Mute: #{state[:mute]}, Speaker layout: #{state[:speaker_layout]}"
       puts "Play: #{state[:play]}, Repeat: #{state[:repeat]}, Shuffle: #{state[:shuffle]}"
       puts "Time: #{state[:time]}"
@@ -230,14 +227,23 @@ module OnkyoEiscp
     end
 
 
-    def send(c, *arg)
+    def send(*args)
       raise "Not connected" unless connected?
-      # if only a number is given it gets translated as the "n" command followed by 
-      # the given number
-      c, arg = "n", c if c =~ /^[0-9]$/      
-      command = COMMANDS[c.to_sym]
-      raise "#{c}: No such command" if command.nil?
-      command = command.call arg[0] if command.respond_to? :call
+      raise "Wrong number of args" if args.length > 2
+      
+      if args.empty?
+        key = "s"       # No args translates to "s". 
+      elsif  args[0] =~ /^[0-9]$/
+        key, opt = "n", args[0]          # Single number translates to "n <number>"  
+      else 
+        key, opt = args[0], args[1]
+      end       
+      
+      command = COMMANDS[key.to_sym]
+
+      raise "#{key}: No such command" if command.nil?
+      
+      command = command.call opt if command.respond_to? :call
       size = command.length + 3
       packet = "ISCP\x00\x00\x00\x10\x00\x00\x00" << [size].pack("C") << 
                "\x01\x00\x00\x00!1" << command << "\r"
@@ -305,10 +311,9 @@ module OnkyoEiscp
       send "track"; sleep 0.2
       send "title"; sleep 0.2
       send "ls"; sleep 0.2
-      send "a?"; sleep 0.2
+      send "v?"; sleep 0.2
       send "m?"; sleep 0.2
-      send "s?"; sleep 0.2
-      send "n?"; sleep 0.2
+      send "status?"; sleep 0.2
     end
 
   end
@@ -343,7 +348,7 @@ module OnkyoEiscp
           puts "#{eval command}"
         else 
           # Everything else is an onkyo command 
-          client.send *command.split unless command.empty?
+          client.send *command.split 
         end
       rescue Exception => e
         puts e 
