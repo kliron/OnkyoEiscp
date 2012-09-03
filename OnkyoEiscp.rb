@@ -154,13 +154,20 @@ module OnkyoEiscp
     def update(state)
       puts "--------------% Folder Info %---------------"
       entries = state[:folder_entries] || []
-      entries.each_with_index { |e,i| puts "%s" % (i == state[:cursor_pos] ? "*" : " ") + "#{i} #{e}" } 
+      if state[:menu_depth] == 22 and state[:source].empty?
+        puts "... Playing ..."
+      else
+        entries.each_with_index do |e,i| 
+          puts "%s" % (i == state[:cursor_pos] ? "*" : " ") + "#{i} #{e}" 
+        end 
+        puts "Source: #{state[:source] || "---"}"
+      end
+      puts "Title: #{state[:title] || "----"}"
       puts "Artist: #{state[:artist] || "----"}"
       puts "Album: #{state[:album] || "----"}"
-      puts "Track: #{state[:track] || "----/----"}"
+      puts "Track: #{state[:track] || "----/----"}, Time: #{state[:time]}" 
       puts "Volume: #{state[:volume]}, Mute: #{state[:mute]}, Speaker layout: #{state[:speaker_layout]}"
-      puts "Play: #{state[:play]}, Repeat: #{state[:repeat]}, Shuffle: #{state[:shuffle]}"
-      puts "Time: #{state[:time]}"
+      puts "Status: #{state[:play]}, Repeat: #{state[:repeat]}, Shuffle: #{state[:shuffle]}"
     end
 
     def jsonize(state)
@@ -257,6 +264,15 @@ module OnkyoEiscp
       type, params = m[0..2], m[3..m.length]
 
       op = case type
+           when "NLT"
+           # 1st byte is: the network source type
+           # 2nd byte is: menu depth (how far you dug down)
+           # 3rd,4th byte: selected item from list
+           # 5th, 6th: total items in list
+           # 2nd to last byte: network icon for net GUI
+           # Last byte: always 00      
+             @state[:source] = params[22..params.length] 
+             @state[:menu_depth] = params[2..3].to_i
            when "NTM" then @state[:time] = params; nil   # prevents observer's update calls 
            when "NAT" then @state[:artist] = params 
            when "NAL" then @state[:album] = params 
@@ -313,6 +329,7 @@ module OnkyoEiscp
       send "ls"; sleep 0.2
       send "v?"; sleep 0.2
       send "m?"; sleep 0.2
+      send "speaker?"; sleep 0.2
       send "status?"; sleep 0.2
     end
 
