@@ -72,6 +72,7 @@ module OnkyoEiscp
     vtuner 
     lastfm 
     spotify
+    goto => Custom command to quickly navigate to a destination 
 }
 
 
@@ -142,11 +143,16 @@ module OnkyoEiscp
   :favorites => "NSV010",
   :vtuner => "NSV020",
   :lastfm => "NSV060",
-  :spotify => "NSV0A1"
+  :spotify => "NSV0A1",
+  :goto =>  { :folders => ["top", "top", "6", "0", "1", "3"],
+              :classic => ["top", "top", "6", "0", "1", "3", "1"],
+              :collections => ["top", "top", "6", "0", "1", "3", "2"],
+              :playlists => ["top", "top", "6", "0", "1", "3", "7"],
+              :radio => ["top", "top", "0", "1", "0"]
+  }
   }
 
-
-  class Watcher
+    class Watcher
     def initialize(c, f=:update)
       c.add_observer(self, f)
     end
@@ -162,12 +168,13 @@ module OnkyoEiscp
         end 
         puts "Source: #{state[:source] || "---"}"
       end
-      puts "Title: #{state[:title] || "----"}"
-      puts "Artist: #{state[:artist] || "----"}"
-      puts "Album: #{state[:album] || "----"}"
-      puts "Track: #{state[:track] || "----/----"}, Time: #{state[:time]}" 
+      puts "Title: #{state[:title] || "---"}"
+      puts "Artist: #{state[:artist] || "---"}"
+      puts "Album: #{state[:album] || "---"}"
+      puts "Track: #{state[:track] || "---/---"}, Time: #{state[:time]}" 
       puts "Volume: #{state[:volume]}, Mute: #{state[:mute]}, Speaker layout: #{state[:speaker_layout]}"
       puts "Status: #{state[:play]}, Repeat: #{state[:repeat]}, Shuffle: #{state[:shuffle]}"
+      $stdout.flush
     end
 
     def jsonize(state)
@@ -182,6 +189,7 @@ module OnkyoEiscp
     include Observable
 
     attr_reader :ip, :port, :socket, :listener, :state, :connected, :lastPacket
+    attr_accessor :delay
 
     def initialize(ip, port)
       @connected = false
@@ -189,6 +197,7 @@ module OnkyoEiscp
       @ip = ip
       @port = port
       @lastPacket = nil
+      @delay = 0.5       # Reducing the interval between commands messes the receiver badly
     end
 
 
@@ -234,7 +243,17 @@ module OnkyoEiscp
     end
 
 
-    def send(*args)
+
+    def send(c)
+        size = c.length + 3
+        packet = "ISCP\x00\x00\x00\x10\x00\x00\x00" << [size].pack("C") << 
+        "\x01\x00\x00\x00!1" << c << "\r"
+        @socket.write packet
+        @lastPacket = packet
+    end
+
+
+    def do_command(*args)
       raise "Not connected" unless connected?
       raise "Wrong number of args" if args.length > 2
       
@@ -245,19 +264,21 @@ module OnkyoEiscp
       else 
         key, opt = args[0], args[1]
       end       
-      
+
       command = COMMANDS[key.to_sym]
-
       raise "#{key}: No such command" if command.nil?
-      
-      command = command.call opt if command.respond_to? :call
-      size = command.length + 3
-      packet = "ISCP\x00\x00\x00\x10\x00\x00\x00" << [size].pack("C") << 
-               "\x01\x00\x00\x00!1" << command << "\r"
 
-      @socket.write packet
-      @lastPacket = packet
-    end
+      command = command.call opt if command.respond_to? :call
+
+      if key == "goto"             
+        path = command[opt.to_sym]       
+        raise "No such selecton" if path.nil?
+        path.each { |c| do_command c; }
+      else 
+        send command 
+      end
+      sleep @delay
+  end
 
 
     def update(m)
@@ -320,17 +341,7 @@ module OnkyoEiscp
 
 
     def hello
-      # Reducing the sleep time often causes onkyo to become unresponsive
-      puts "Getting onkyo state..."
-      sleep 0.2
-      send "artist"; sleep 0.2
-      send "track"; sleep 0.2
-      send "title"; sleep 0.2
-      send "ls"; sleep 0.2
-      send "v?"; sleep 0.2
-      send "m?"; sleep 0.2
-      send "speaker?"; sleep 0.2
-      send "status?"; sleep 0.2
+      "artist track title ls v? m? speaker? status?".split.each { |c| do_command c } 
     end
 
   end
@@ -365,7 +376,7 @@ module OnkyoEiscp
           puts "#{eval command}"
         else 
           # Everything else is an onkyo command 
-          client.send *command.split 
+          client.do_command *command.split 
         end
       rescue Exception => e
         puts e 
