@@ -4,6 +4,7 @@ module OnkyoEiscp
 
   require 'socket'
   require 'observer'
+  require 'readline'
   require 'json'
 
 @@help = %s{ Command reference:
@@ -144,11 +145,13 @@ module OnkyoEiscp
   :vtuner => "NSV020",
   :lastfm => "NSV060",
   :spotify => "NSV0A1",
-  :goto =>  { :folders => ["top", "top", "6", "0", "1", "3"],
-              :classic => ["top", "top", "6", "0", "1", "3", "1"],
-              :collections => ["top", "top", "6", "0", "1", "3", "2"],
-              :playlists => ["top", "top", "6", "0", "1", "3", "7"],
-              :radio => ["top", "top", "0", "1", "0"]
+  :goto =>  { :folders => ["top", "top", "top", "dlna", "0", "1", "3"],
+              :classic => ["top", "top", "top", "dlna", "0", "1", "3", "1"],
+              :jazz => ["top", "top","top", "dlna", "0", "1", "3", "0"],
+              :rock => ["top", "top","top", "dlna", "0", "1", "3", "9"],
+              :collections => ["top", "top", "top", "dlna", "0", "1", "3", "2"],
+              :playlists => ["top", "top", "top", "dlna", "0", "1", "3", "7"],
+              :radio => ["top", "top", "top", "vtuner", "1", "0"]
   }
   }
 
@@ -160,7 +163,7 @@ module OnkyoEiscp
     def update(state)
       puts "--------------% Folder Info %---------------"
       entries = state[:folder_entries] || []
-      if state[:menu_depth] == 22 and state[:source].empty?
+      if state[:menu_depth] == 22 
         puts "... Playing ..."
       else
         entries.each_with_index do |e,i| 
@@ -271,9 +274,18 @@ module OnkyoEiscp
       command = command.call opt if command.respond_to? :call
 
       if key == "goto"             
-        path = command[opt.to_sym]       
+        path = command[opt.to_sym]
         raise "No such selecton" if path.nil?
-        path.each { |c| do_command c; sleep 2 }    # Onkyo delays A LOT especially when navigating between different input selectors
+
+        source = @state[:source]       
+        if (source == "vTuner" and path[3] == "dlna") or 
+          (source == "DLNA" and path[3] == "vtunner")
+          wait = 3
+        else
+          wait = 0.2
+        end
+
+        path.each { |c| do_command c; sleep wait  }    
       else 
         send command 
       end
@@ -292,7 +304,11 @@ module OnkyoEiscp
            # 5th, 6th: total items in list
            # 2nd to last byte: network icon for net GUI
            # Last byte: always 00      
-             @state[:source] = params[22..params.length] 
+             case params[0..1]
+             when "00" then @state[:source] = "DLNA"
+             when "02" then  @state[:source] = "vTuner"
+             when "F3" then  @state[:source] = "NET"
+             end
              @state[:menu_depth] = params[2..3].to_i
            when "NTM" then @state[:time] = params; nil   # prevents observer's update calls 
            when "NAT" then @state[:artist] = params 
@@ -360,13 +376,18 @@ module OnkyoEiscp
     client.connect &handler
     client.hello
 
+    stty_save = `stty -g`.chomp
     trap("INT") { puts "Restarting..."; client.disconnect; client.connect &handler } # ^C
-    trap("QUIT") { puts "Ouch!"; client.disconnect; exit! 1 } # ^\
+    trap("QUIT") do  # ^\
+      puts "Ouch!"
+      client.disconnect
+      system('stty', stty_save); exit! 1 
+    end 
 
     # Main loop 
     loop do
       begin
-        command = gets.chomp.strip
+        command = Readline.readline('>> ', true).chomp.strip
         case command
         when /^(:?\?|h|help)/
           # Print help
