@@ -197,7 +197,7 @@ module OnkyoEiscp
       @ip = ip
       @port = port
       @lastPacket = nil
-      @delay = 0.5       # Reducing the interval between commands messes the receiver badly
+      @delay = 0.3       # Reducing the interval between commands messes the receiver badly
     end
 
 
@@ -273,7 +273,7 @@ module OnkyoEiscp
       if key == "goto"             
         path = command[opt.to_sym]       
         raise "No such selecton" if path.nil?
-        path.each { |c| do_command c; }
+        path.each { |c| do_command c; sleep 2 }    # Onkyo delays A LOT especially when navigating between different input selectors
       else 
         send command 
       end
