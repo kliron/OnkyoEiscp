@@ -5,6 +5,7 @@ module OnkyoEiscp
   require 'socket'
   require 'observer'
   require 'readline'
+  require 'timeout'
   require 'json'
 
 @@help = %s{ Command reference:
@@ -145,13 +146,13 @@ module OnkyoEiscp
   :vtuner => "NSV020",
   :lastfm => "NSV060",
   :spotify => "NSV0A1",
-  :goto =>  { :folders => ["top", "top", "top", "dlna", "0", "1", "3"],
-              :classic => ["top", "top", "top", "dlna", "0", "1", "3", "1"],
-              :jazz => ["top", "top","top", "dlna", "0", "1", "3", "0"],
-              :rock => ["top", "top","top", "dlna", "0", "1", "3", "9"],
-              :collections => ["top", "top", "top", "dlna", "0", "1", "3", "2"],
-              :playlists => ["top", "top", "top", "dlna", "0", "1", "3", "7"],
-              :radio => ["top", "top", "top", "vtuner", "1", "0"]
+  :goto =>  { :folders => ["top", "6", "0", "1", "3"],
+              :classic => ["top", "6", "0", "1", "3", "1"],
+              :jazz => ["top", "6", "0", "1", "3", "0"],
+              :rock => ["top", "6", "0", "1", "3", "9"],
+              :collections => ["top", "6", "0", "1", "3", "2"],
+              :playlists => ["top", "6", "0", "1", "3", "7"],
+              :radio => ["top", "0", "1"]
   }
   }
 
@@ -161,22 +162,26 @@ module OnkyoEiscp
     end
 
     def update(state)
-      puts "--------------% Folder Info %---------------"
-      entries = state[:folder_entries] || []
-      if state[:menu_depth] == 22 
-        puts "... Playing ..."
+      entries = state[:content] || []
+      idx = state[:cursor_pos]
+      if state[:depth] == 22 or entries.empty?
+        content = "... Playing ..."
       else
-        entries.each_with_index do |e,i| 
-          puts "%s" % (i == state[:cursor_pos] ? "*" : " ") + "#{i} #{e}" 
-        end 
-        puts "Source: #{state[:source] || "---"}"
+        content = entries.map do |s;c,i| 
+        i = entries.index s
+        c = i == idx ? "*" : " "
+        "%c%i %s" % [c,i,s] 
+        end.join("\n")
       end
-      puts "Title: #{state[:title] || "---"}"
-      puts "Artist: #{state[:artist] || "---"}"
-      puts "Album: #{state[:album] || "---"}"
-      puts "Track: #{state[:track] || "---/---"}, Time: #{state[:time]}" 
-      puts "Volume: #{state[:volume]}, Mute: #{state[:mute]}, Speaker layout: #{state[:speaker_layout]}"
-      puts "Status: #{state[:play]}, Repeat: #{state[:repeat]}, Shuffle: #{state[:shuffle]}"
+      puts "%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s" %
+     [%[--------------% Folder Info %---------------],
+      content,
+      %[Source: #{state[:source] || "---"}], %[Title: #{state[:title] || "---"}],
+      %[Artist: #{state[:artist] || "---"}], %[Album: #{state[:album] || "---"}],
+      %[Track: #{state[:track] || "---/---"}, Time: #{state[:time]}],
+      %[Volume: #{state[:volume]}, Mute: #{state[:mute]}, Speaker layout: #{state[:speaker_layout]}], 
+      %[Status: #{state[:play]}, Repeat: #{state[:repeat]}, Shuffle: #{state[:shuffle]}],
+      %[Current selection: #{state[:index]}]]
       $stdout.flush
     end
 
@@ -192,7 +197,6 @@ module OnkyoEiscp
     include Observable
 
     attr_reader :ip, :port, :socket, :listener, :state, :connected, :lastPacket
-    attr_accessor :delay
 
     def initialize(ip, port)
       @connected = false
@@ -200,7 +204,12 @@ module OnkyoEiscp
       @ip = ip
       @port = port
       @lastPacket = nil
-      @delay = 0.3       # Reducing the interval between commands messes the receiver badly
+      @commandTimeout = 5       
+    end
+
+
+    def wait(interval=0.3)
+      sleep interval
     end
 
 
@@ -246,7 +255,6 @@ module OnkyoEiscp
     end
 
 
-
     def send(c)
         size = c.length + 3
         packet = "ISCP\x00\x00\x00\x10\x00\x00\x00" << [size].pack("C") << 
@@ -262,34 +270,39 @@ module OnkyoEiscp
       
       if args.empty?
         key = "s"       # No args translates to "s". 
-      elsif  args[0] =~ /^[0-9]$/
+      elsif  args[0] =~ /^\d$/
         key, opt = "n", args[0]          # Single number translates to "n <number>"  
       else 
         key, opt = args[0], args[1]
       end       
 
-      command = COMMANDS[key.to_sym]
-      raise "#{key}: No such command" if command.nil?
-
+      raise "#{key}: No such command" if (command = COMMANDS[key.to_sym]).nil?
       command = command.call opt if command.respond_to? :call
 
       if key == "goto"             
-        path = command[opt.to_sym]
-        raise "No such selecton" if path.nil?
+        raise "No such selecton" if (path = command[opt.to_sym]).nil?
 
-        source = @state[:source]       
-        if (source == "vTuner" and path[3] == "dlna") or 
-          (source == "DLNA" and path[3] == "vtunner")
-          wait = 3
-        else
-          wait = 0.2
+        do_step = ->(step) do      
+          # keeps redoing step until predicate returns true or commandTimeout is reached
+          d, i = @state[:depth], @state[:index]   # state closed over
+          pred = case step
+                 when /^\d$/  # list item selector
+                   proc { @state[:depth] == d + 1 }
+                 else         # top menu selector 
+                   proc { @state[:depth] == 0 }
+                 end
+
+          Timeout.timeout @commandTimeout do
+            until pred.call
+              do_command step; wait 0.5  
+            end
+          end
         end
 
-        path.each { |c| do_command c; sleep wait  }    
+        path.each { |step| do_step.call step }    
       else 
-        send command 
+        send command; wait
       end
-      sleep @delay
   end
 
 
@@ -305,11 +318,12 @@ module OnkyoEiscp
            # 2nd to last byte: network icon for net GUI
            # Last byte: always 00      
              case params[0..1]
-             when "00" then @state[:source] = "DLNA"
-             when "02" then  @state[:source] = "vTuner"
-             when "F3" then  @state[:source] = "NET"
+             when "00" then @state[:source] = "dlna"
+             when "02" then  @state[:source] = "vtuner"
+             when "F3" then  @state[:source] = "net"
              end
-             @state[:menu_depth] = params[2..3].to_i
+             @state[:depth] = params[2..3].to_i
+             @state[:index] = params[4..5].to_i
            when "NTM" then @state[:time] = params; nil   # prevents observer's update calls 
            when "NAT" then @state[:artist] = params 
            when "NAL" then @state[:album] = params 
@@ -343,8 +357,8 @@ module OnkyoEiscp
              case params[0]
              when "C" then @state[:cursor_pos] = idx.to_i
              when /A|U/
-               @state[:folder_entries] = [] if idx == "0"
-               @state[:folder_entries].push params[3..params.length]
+               @state[:content] = [] if idx == "0"
+               @state[:content].push params[3..params.length]
              end
            else 
              nil
@@ -379,7 +393,7 @@ module OnkyoEiscp
     stty_save = `stty -g`.chomp
     trap("INT") { puts "Restarting..."; client.disconnect; client.connect &handler } # ^C
     trap("QUIT") do  # ^\
-      puts "Ouch!"
+      puts "Exiting!"
       client.disconnect
       system('stty', stty_save); exit! 1 
     end 
