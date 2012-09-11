@@ -52,8 +52,8 @@ module OnkyoEiscp
     display 
     right 
     left 
-    tup => Track up
-    tdn => Track down
+    tu => Track up
+    td => Track down
     u => Up
     d => Down
     s => Select current element. Pressing ENTER without any arguments translates also to 's'
@@ -124,8 +124,8 @@ module OnkyoEiscp
   :display => "NTCDISPLAY",
   :right => "NTCRIGHT",
   :left => "NTCLEFT",
-  :tup => "NTCTRUP",
-  :tdn => "NTCTRDN",
+  :tu => "NTCTRUP",
+  :td => "NTCTRDN",
   :u => "NTCUP",
   :d => "NTCDOWN",
   :s => "NTCSELECT",
@@ -151,6 +151,8 @@ module OnkyoEiscp
               :jazz => ["top", "6", "0", "1", "3", "0"],
               :rock => ["top", "6", "0", "1", "3", "9"],
               :collections => ["top", "6", "0", "1", "3", "2"],
+              :soundtracks => ["top", "6", "0", "1", "3", "u", "0"],
+              :unsorted => ["top", "6", "0", "1", "3", "u", "1"],
               :playlists => ["top", "6", "0", "1", "3", "7"],
               :radio => ["top", "0", "1"]
   }
@@ -181,7 +183,7 @@ module OnkyoEiscp
       %[Track: #{state[:track] || "---/---"}, Time: #{state[:time]}],
       %[Volume: #{state[:volume]}, Mute: #{state[:mute]}, Speaker layout: #{state[:speaker_layout]}], 
       %[Status: #{state[:play]}, Repeat: #{state[:repeat]}, Shuffle: #{state[:shuffle]}],
-      %[Current selection: #{state[:index]}]]
+      %[Current selection: #{state[:cursor_pos]}]]
       $stdout.flush
     end
 
@@ -284,18 +286,31 @@ module OnkyoEiscp
 
         do_step = ->(step) do      
           # keeps redoing step until predicate returns true or commandTimeout is reached
-          d, i = @state[:depth], @state[:index]   # state closed over
+          
+          # State before the step
+          d, c = @state[:depth], @state[:cursor_pos]   
+
           pred = case step
                  when /^\d$/  # list item selector
                    proc { @state[:depth] == d + 1 }
-                 else         # top menu selector 
+                 when /^u$/     # cursor up
+                   proc do |;cp| 
+                     cp = @state[:cursor_pos]
+                     c == 0 ? cp >= 0 : cp == c - 1 
+                   end
+                 when /^d$/     # cursor down
+                   proc do  |;cp| 
+                     cp = @state[:cursor_pos]
+                     c == 9 ? cp == 0 : cp == c + 1 
+                   end
+                 when /^top$/ 
                    proc { @state[:depth] == 0 }
                  end
 
           Timeout.timeout @commandTimeout do
-            until pred.call
-              do_command step; wait 0.5  
-            end
+            begin
+              do_command step; wait 0.3  
+            end until pred.call
           end
         end
 
@@ -313,8 +328,8 @@ module OnkyoEiscp
            when "NLT"
            # 1st byte is: the network source type
            # 2nd byte is: menu depth (how far you dug down)
-           # 3rd,4th byte: selected item from list
-           # 5th, 6th: total items in list
+           # 3rd,4th byte: selected item from list (index)
+           # 5th, 6th: Index of item under cursor
            # 2nd to last byte: network icon for net GUI
            # Last byte: always 00      
              case params[0..1]
@@ -324,7 +339,7 @@ module OnkyoEiscp
              end
              @state[:depth] = params[2..3].to_i
              @state[:index] = params[4..5].to_i
-           when "NTM" then @state[:time] = params; nil   # prevents observer's update calls 
+           when "NTM" then @state[:time] = params; nil   # nil prevents observer's update calls 
            when "NAT" then @state[:artist] = params 
            when "NAL" then @state[:album] = params 
            when "NTI" then @state[:title] = params
