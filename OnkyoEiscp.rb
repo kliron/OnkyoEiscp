@@ -10,40 +10,40 @@ module OnkyoEiscp
 
 @@help = %s{ Command reference:
 
-    p0 => standby
-    p1 => system on
-    p? => Gets the system power status
-    sb => Sets SurrBack Speaker
-    sh => Sets FrontHigh / SurrBack + FrontHigh
-    sw => Sets FrontWide / SurrBack + FrontWide
-    shw => Sets Front High + Front Wide 
-    up => Sets speaker switch wrap-around
-    speaker? => Gets the speaker state
-    m1 => Mute ON
-    m0 => Mute OFF
-    m? => Gets the audio muting state
-    m => Sets audio muting wrap-around
-    vu => Master volume level up
-    vd => Master volume level down
-    v => Followed by a hex literal in the range "00"-"64" (volume level in hexadecimal)
-    v? => Get master volume level
-    net => NET 
-    vcr => VCR/DVR
-    cbl => CBL/SAT
-    game => GAME/TV
-    aux => AUX
-    pc => PC
-    bd => BD/DVD
-    fm => FM
-    am => AM
-    tuner => TUNER
-    usb => USB
-    iu => Input Selector position up
-    id => Input Selector position down
-    i? => Gets the selector position
-    f => Followed by 5 digit integer (no spaces). Sets radio frequency.
-    f? => Get the tuning frequency
-    fdt => Starts/restarts Direct Tunning Mode
+    p0: standby
+    p1: system on
+    p?: Gets the system power status
+    sb: Sets SurrBack Speaker
+    sh: Sets FrontHigh / SurrBack + FrontHigh
+    sw: Sets FrontWide / SurrBack + FrontWide
+    shw: Sets Front High + Front Wide 
+    up: Sets speaker switch wrap-around
+    speaker?: Gets the speaker state
+    m1: Mute ON
+    m0: Mute OFF
+    m?: Gets the audio muting state
+    m: Sets audio muting wrap-around
+    vu: Master volume level up
+    vd: Master volume level down
+    v: Followed by a hex literal in the range "00"-"64" (volume level in hexadecimal)
+    v?: Get master volume level
+    net: NET 
+    vcr: VCR/DVR
+    cbl: CBL/SAT
+    game: GAME/TV
+    aux: AUX
+    pc: PC
+    bd: BD/DVD
+    fm: FM
+    am: AM
+    tuner: TUNER
+    usb: USB
+    iu: Input Selector position up
+    id: Input Selector position down
+    i?: Gets the selector position
+    f: Followed by 5 digit integer (no spaces). Sets radio frequency.
+    f?: Get the tuning frequency
+    fdt: Starts/restarts Direct Tunning Mode
     play      
     stop 
     pause 
@@ -52,29 +52,29 @@ module OnkyoEiscp
     display 
     right 
     left 
-    tu => Track up
-    td => Track down
-    u => Up
-    d => Down
-    s => Select current element. Pressing ENTER without any arguments translates also to 's'
-    n => Followed by a number 0-9 (separated by space). Select line number. 
-    r => Return
-    cu => Channel up (iRadio)
-    cd => Channel down (iRadio)
-    ls => List
+    tu: Track up
+    td: Track down
+    u: Up
+    d: Down
+    s: Select current element. Pressing ENTER without any arguments translates also to 's'
+    n: Followed by a number 0-9 (separated by space). Select line number. 
+    r: Return
+    cu: Channel up (iRadio)
+    cd: Channel down (iRadio)
+    ls: List
     menu 
-    top => Top menu for the NET input selector
+    top: Top menu for the NET input selector
     artist 
     album 
     title 
     track 
-    status? => State of the NET input     
+    status?: State of the NET input     
     dlna 
     favorites 
     vtuner 
     lastfm 
     spotify
-    goto => Custom command to quickly navigate to a destination 
+    goto: Custom command to quickly navigate to a destination 
 }
 
 
@@ -82,79 +82,79 @@ module OnkyoEiscp
   SERVER_PORT = "60128"
 
   COMMANDS = {
-  :p0 => "PWR00",
-  :p1 => "PWR01",
-  :p? => "PWRQSTN",
-  :m0 => "AMT00",      
-  :m1 => "AMT01",
-  :m? => "AMTQSTN",
-  :m => "AMTTG",
-  :vu => "MVLUP",
-  :vd => "MVLDOWN",
-  :v => ->(a) { "MVL" << a }, 
-  :v? => "MVLQSTN",
-  :sb => "SPLSB",
-  :sh => "SPLFH",
-  :sw => "SPLFW",
-  :shw => "SPLHW",
-  :up => "SPLUP",
-  :speaker? => "SPLQSTN",
-  :net => "SLI2B",
-  :vcr => "SLI00",
-  :cbl => "SLI01",
-  :game => "SLI02",
-  :aux => "SLI03",
-  :pc => "SLI05",
-  :bd => "SLI10",
-  :fm => "SLI24",
-  :am => "SLI25",
-  :tuner => "SLI26",
-  :usb => "SLI2C",
-  :iu => "SLIUP",
-  :id => "SLIDOWN",
-  :i? => "SLIQSTN",
-  :f => ->(a) { "TUN" << a },
-  :f? => "TUNQSTN",
-  :fdt => "TUNDIRECT",
-  :play => "NTCPLAY",
-  :stop => "NTCSTOP",
-  :pause => "NTCPAUSE",
-  :repeat => "NTCREPEAT",
-  :random => "NTCRANDOM",
-  :display => "NTCDISPLAY",
-  :right => "NTCRIGHT",
-  :left => "NTCLEFT",
-  :tu => "NTCTRUP",
-  :td => "NTCTRDN",
-  :u => "NTCUP",
-  :d => "NTCDOWN",
-  :s => "NTCSELECT",
-  :n => ->(a) { "NLSL" << a },    
-  :r => "NTCRETURN",
-  :cu => "NTCCHUP",
-  :cd => "NTCCHDN",
-  :ls => "NTCLIST",
-  :menu => "NTCMENU",
-  :top => "NTCTOP",
-  :artist => "NATQSTN",
-  :album => "NALQSTN",
-  :title => "NTIQSTN",
-  :track => "NTRQSTN",
-  :status? => "NSTQSTN",
-  :dlna => "NSV000",
-  :favorites => "NSV010",
-  :vtuner => "NSV020",
-  :lastfm => "NSV060",
-  :spotify => "NSV0A1",
-  :goto =>  { :folders => ["top", "6", "0", "1", "3"],
-              :classic => ["top", "6", "0", "1", "3", "1"],
-              :jazz => ["top", "6", "0", "1", "3", "0"],
-              :rock => ["top", "6", "0", "1", "3", "9"],
-              :collections => ["top", "6", "0", "1", "3", "2"],
-              :soundtracks => ["top", "6", "0", "1", "3", "u", "0"],
-              :unsorted => ["top", "6", "0", "1", "3", "u", "1"],
-              :playlists => ["top", "6", "0", "1", "3", "7"],
-              :radio => ["top", "0", "1"]
+  p0: "PWR00",
+  p1: "PWR01",
+  p?: "PWRQSTN",
+  m0: "AMT00",      
+  m1: "AMT01",
+  m?: "AMTQSTN",
+  m: "AMTTG",
+  vu: "MVLUP",
+  vd: "MVLDOWN",
+  v: ->(a) { "MVL" << a }, 
+  v?: "MVLQSTN",
+  sb: "SPLSB",
+  sh: "SPLFH",
+  sw: "SPLFW",
+  shw: "SPLHW",
+  up: "SPLUP",
+  speaker?: "SPLQSTN",
+  net: "SLI2B",
+  vcr: "SLI00",
+  cbl: "SLI01",
+  game: "SLI02",
+  aux: "SLI03",
+  pc: "SLI05",
+  bd: "SLI10",
+  fm: "SLI24",
+  am: "SLI25",
+  tuner: "SLI26",
+  usb: "SLI2C",
+  iu: "SLIUP",
+  id: "SLIDOWN",
+  i?: "SLIQSTN",
+  f: ->(a) { "TUN" << a },
+  f?: "TUNQSTN",
+  fdt: "TUNDIRECT",
+  play: "NTCPLAY",
+  stop: "NTCSTOP",
+  pause: "NTCPAUSE",
+  repeat: "NTCREPEAT",
+  random: "NTCRANDOM",
+  display: "NTCDISPLAY",
+  right: "NTCRIGHT",
+  left: "NTCLEFT",
+  tu: "NTCTRUP",
+  td: "NTCTRDN",
+  u: "NTCUP",
+  d: "NTCDOWN",
+  s: "NTCSELECT",
+  n: ->(a) { "NLSL" << a },    
+  r: "NTCRETURN",
+  cu: "NTCCHUP",
+  cd: "NTCCHDN",
+  ls: "NTCLIST",
+  menu: "NTCMENU",
+  top: "NTCTOP",
+  artist: "NATQSTN",
+  album: "NALQSTN",
+  title: "NTIQSTN",
+  track: "NTRQSTN",
+  status?: "NSTQSTN",
+  dlna: "NSV000",
+  favorites: "NSV010",
+  vtuner: "NSV020",
+  lastfm: "NSV060",
+  spotify: "NSV0A1",
+  goto: { folders: ["top", "6", "0", "1", "3"],
+          classic: ["top", "6", "0", "1", "3", "1"],
+          jazz: ["top", "6", "0", "1", "3", "0"],
+          rock: ["top", "6", "0", "1", "3", "9"],
+          collections: ["top", "6", "0", "1", "3", "2"],
+          soundtracks: ["top", "6", "0", "1", "3", "u", "0"],
+          unsorted: ["top", "6", "0", "1", "3", "u", "1"],
+          playlists: ["top", "6", "0", "1", "3", "7"],
+          radio: ["top", "0", "1"]
   }
   }
 
@@ -397,7 +397,7 @@ module OnkyoEiscp
     
     client = OnkyoClient.new SERVER_IP, SERVER_PORT
     watcher = Watcher.new client, :update
-    # 2 handlers user can switch at runtime. ^C to force client restart afterwards.
+    # 2 handlers user can switch at runtime. 
     printer = proc { |m| puts m unless m =~ /^NTM/ }
     updater = proc { |m| client.update m }
     handler = updater
@@ -406,9 +406,8 @@ module OnkyoEiscp
     client.hello
 
     stty_save = `stty -g`.chomp
-    trap("INT") { puts "Restarting..."; client.disconnect; client.connect &handler } # ^C
-    trap("QUIT") do  # ^\
-      puts "Exiting!"
+    trap("INT") do  # ^\
+      puts "Stopping..."
       client.disconnect
       system('stty', stty_save); exit! 1 
     end 
@@ -418,12 +417,16 @@ module OnkyoEiscp
       begin
         command = Readline.readline('>> ', true).chomp.strip
         case command
-        when /^(:?\?|h|help)/
+        when /^(\?|h|help)/
           # Print help
           puts @@help
         when /^\!/
           # Everything starting with "!" is a ruby command
           puts "#{eval command}"
+        when /^(x|q|exit|quit|bye)$/
+          # Quit
+          puts "Stopping..."
+          system('stty', stty_save); exit! 0 
         else 
           # Everything else is an onkyo command 
           client.do_command *command.split 
